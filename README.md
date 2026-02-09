@@ -1,70 +1,35 @@
-# Task Runner MCP
+# task-runner-mcp
 
-MCP server that lets AI agents manage background processes.
+An **MCP server** that lets AI agents start/stop and interact with long-running background processes (dev servers, builds, scripts) that should persist beyond short exec timeouts.
 
-## Problem
+## Install / Build
 
-OpenClaw exec sessions have timeouts. Background processes spawned from agents get killed when sessions end. Agents need a proper way to start, monitor, and control long-running processes.
+```bash
+npm install
+npm run build
+```
 
-## Solution
+## Run
 
-A lightweight MCP server (~300 LOC) that:
-- Spawns processes detached from parent
-- Persists task state across server restarts
-- Captures stdout/stderr to log files
-- Provides tools for agents to manage tasks
+This server speaks MCP over stdio:
+
+```bash
+node dist/index.js
+```
 
 ## Tools
 
-| Tool | Description |
-|------|-------------|
-| `task_start` | Start process → `{id, pid, status}` |
-| `task_stop` | Kill task (SIGTERM → SIGKILL) |
-| `task_signal` | Send specific signal (HUP, INT, etc.) |
-| `task_status` | Get state + exit code + uptime |
-| `task_logs` | Get stdout/stderr (tail, since) |
-| `task_list` | List tasks, filter by tags |
-| `task_write` | Write to stdin (for interactive) |
-| `task_wait` | Block until exit or timeout |
-| `task_prune` | Cleanup old stopped tasks |
+- `task_start` — start a new task via `spawn()` (command, args, cwd, env, name, maxLogBytes)
+- `task_stop` — stop a task (SIGTERM then SIGKILL after timeout)
+- `task_signal` — send arbitrary signal
+- `task_status` — get status (running/exited, exit code, pid)
+- `task_logs` — get logs (stdout/stderr combined) with `offset`, `tail` options
+- `task_list` — list tasks
+- `task_write` — write to stdin (for interactive processes)
+- `task_wait` — wait until exit (with timeout)
+- `task_prune` — remove exited tasks from memory
 
-## State Machine
+## Notes
 
-```
-pending → running → stopped (exit 0)
-                  → failed (exit != 0)
-                  → killed (signal)
-                  → timeout
-                  → lost (died while server down)
-```
-
-## File Structure
-
-```
-~/.task-runner/
-├── state.json      # Task metadata
-├── logs/{id}.log   # Combined stdout/stderr
-└── pids/{id}.pid   # For orphan recovery
-```
-
-## Tech Stack
-
-- **Language:** TypeScript (Node.js)
-- **Protocol:** MCP (stdio transport)
-- **Storage:** JSON file (state.json)
-- **Target:** ~300 lines of code
-
-## Security
-
-```js
-{
-  maxConcurrentTasks: 20,
-  maxLogSizeBytes: 10 * 1024 * 1024,
-  allowedCwds: ['/home/user'],
-  blockedEnvVars: ['AWS_SECRET_KEY', 'GITHUB_TOKEN']
-}
-```
-
-## Status
-
-🚧 **Planned** — Design complete, implementation pending.
+- Logs are kept **in memory** per task, bounded by `maxLogBytes` (default: 1 MiB).
+- `task_logs` returns combined output with simple `[stdout]` / `[stderr]` prefixes.
